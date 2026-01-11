@@ -1,0 +1,18 @@
+[package]
+name = "fresh-post"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.11", features = ["cookies", "json"] }
+scraper = "0.19"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+tempfile = "3.8"
+anyhow = "1.0"
+url = "2.5"
+
+[dev-dependencies]
+tokio-test = "0.4"
