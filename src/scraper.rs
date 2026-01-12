@@ -89,6 +89,10 @@ pub fn parse_jobs_from_html(html: &str) -> Result<Vec<JobPosting>> {
     let job_card_selector = Selector::parse(".base-card, .job-card-container, [data-job-id]")
         .map_err(|e| anyhow::anyhow!("Failed to parse job card selector: {:?}", e))?;
     
+    // DEBUG: Count how many job cards we find
+    let job_card_count = document.select(&job_card_selector).count();
+    println!("🔍 Found {} job card elements in HTML", job_card_count);
+    
     let title_selector = Selector::parse("h3.base-search-card__title, .job-card-list__title, a.job-card-list__title")
         .map_err(|e| anyhow::anyhow!("Failed to parse title selector: {:?}", e))?;
     
@@ -101,7 +105,7 @@ pub fn parse_jobs_from_html(html: &str) -> Result<Vec<JobPosting>> {
     let link_selector = Selector::parse("a.base-card__full-link, a.job-card-list__title")
         .map_err(|e| anyhow::anyhow!("Failed to parse link selector: {:?}", e))?;
     
-    let date_selector = Selector::parse("time.job-search-card__listdate, .job-search-card__listdate")
+    let date_selector = Selector::parse("time[class*='job-search-card__listdate'], time.job-search-card__listdate, .job-search-card__listdate, .job-search-card__listdate--new")
         .map_err(|e| anyhow::anyhow!("Failed to parse date selector: {:?}", e))?;
     
     for job_element in document.select(&job_card_selector) {
@@ -113,12 +117,14 @@ pub fn parse_jobs_from_html(html: &str) -> Result<Vec<JobPosting>> {
             .map(|s| s.trim().to_string())
             .unwrap_or_else(|| "Unknown".to_string());
         
-        // Extract company
+        // Extract company (handle nested <a> tags)
         let company = job_element
             .select(&company_selector)
             .next()
-            .and_then(|e| e.text().next())
-            .map(|s| s.trim().to_string())
+            .map(|e| {
+                // Get all text from the element (including nested elements)
+                e.text().collect::<Vec<_>>().join(" ").trim().to_string()
+            })
             .unwrap_or_else(|| "Unknown".to_string());
         
         // Extract location
@@ -163,6 +169,10 @@ pub fn parse_jobs_from_html(html: &str) -> Result<Vec<JobPosting>> {
                     .or_else(|| parse_relative_date(date_str))
             });
         
+        // DEBUG: Print what we extracted
+        println!("   📝 Extracted: '{}' at '{}' in '{}' (date: {:?})", 
+                 title, company, location, posted_date);
+        
         let id = generate_job_id(&url);
         
         jobs.push(JobPosting::new(
@@ -174,6 +184,12 @@ pub fn parse_jobs_from_html(html: &str) -> Result<Vec<JobPosting>> {
             posted_date,
             None, // Description would require another request
         ));
+    }
+    
+    // DEBUG: Show parsing results
+    println!("✅ Successfully parsed {} jobs", jobs.len());
+    if !jobs.is_empty() {
+        println!("   First job: {} at {}", jobs[0].title, jobs[0].company);
     }
     
     Ok(jobs)

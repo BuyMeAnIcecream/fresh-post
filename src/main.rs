@@ -31,6 +31,15 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to fetch jobs page")?;
     
+    // DEBUG: Save HTML for inspection
+    std::fs::write("debug_linkedin.html", &html)
+        .context("Failed to save debug HTML")?;
+    println!("💾 Saved HTML to debug_linkedin.html ({} bytes)", html.len());
+    
+    // DEBUG: Show snippet
+    println!("📄 HTML snippet (first 500 chars):");
+    println!("{}\n", &html[..html.len().min(500)]);
+    
     // Parse jobs from HTML
     let all_jobs = scraper::parse_jobs_from_html(&html)
         .context("Failed to parse jobs from HTML")?;
