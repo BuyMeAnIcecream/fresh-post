@@ -8,7 +8,7 @@ use url::Url;
 use regex::Regex;
 
 /// Build a LinkedIn job search URL
-pub fn build_search_url(keywords: &str, location: &str) -> String {
+pub fn build_search_url(keywords: &str, location: &str, remote: bool, salary_min: Option<u32>) -> String {
     let base_url = "https://www.linkedin.com/jobs/search";
     let mut url = Url::parse(base_url).unwrap();
     
@@ -16,6 +16,19 @@ pub fn build_search_url(keywords: &str, location: &str) -> String {
         .append_pair("keywords", keywords)
         .append_pair("location", location)
         .append_pair("f_TPR", "r86400"); // Last 24 hours filter
+    
+    // Add remote filter if requested (f_WT=2 means remote only)
+    if remote {
+        url.query_pairs_mut().append_pair("f_WT", "2");
+    }
+    
+    // Add salary filter if specified (f_SB2 is minimum salary in USD)
+    // LinkedIn uses increments of $20k, valid range: $40k - $200k
+    if let Some(salary) = salary_min {
+        if salary >= 40000 && salary <= 200000 {
+            url.query_pairs_mut().append_pair("f_SB2", &salary.to_string());
+        }
+    }
     
     url.to_string()
 }
@@ -358,10 +371,22 @@ mod tests {
 
     #[test]
     fn test_build_search_url() {
-        let url = build_search_url("rust developer", "San Francisco");
+        let url = build_search_url("rust developer", "San Francisco", false, None);
         assert!(url.contains("keywords=rust+developer"));
         assert!(url.contains("location=San+Francisco"));
         assert!(url.contains("f_TPR=r86400"));
+    }
+
+    #[test]
+    fn test_build_search_url_with_remote() {
+        let url = build_search_url("rust developer", "San Francisco", true, None);
+        assert!(url.contains("f_WT=2"));
+    }
+
+    #[test]
+    fn test_build_search_url_with_salary() {
+        let url = build_search_url("rust developer", "San Francisco", false, Some(100000));
+        assert!(url.contains("f_SB2=100000"));
     }
 
     #[test]

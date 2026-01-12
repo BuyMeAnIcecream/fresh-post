@@ -1,0 +1,15 @@
+[search]
+# Job search keywords
+keywords = "rust developer"
+
+# Location for job search
+location = "San Francisco Bay Area"
+
+# Filter for remote jobs only (uses LinkedIn's f_WT=2 parameter)
+# Set to true to show only remote jobs
+remote = false
+
+# Minimum salary in USD (e.g., 100000 for $100k)
+# LinkedIn uses increments of $20k, valid range: $40k - $200k
+# Set to 0 or omit to disable salary filter
+salary_min = 0

@@ -17,7 +17,14 @@ async fn main() -> Result<()> {
     
     println!("🔍 Searching LinkedIn jobs...");
     println!("   Keywords: {}", keywords);
-    println!("   Location: {}\n", location);
+    println!("   Location: {}", location);
+    if config.search.remote {
+        println!("   Remote: Yes");
+    }
+    if let Some(salary) = config.search.salary_min {
+        println!("   Min Salary: ${}", salary);
+    }
+    println!();
     
     // Load state
     let state_path = PathBuf::from(STATE_FILE);
@@ -27,7 +34,12 @@ async fn main() -> Result<()> {
     println!("📊 Previously seen jobs: {}\n", app_state.seen_count());
     
     // Build search URL
-    let search_url = scraper::build_search_url(keywords, location);
+    let search_url = scraper::build_search_url(
+        keywords, 
+        location,
+        config.search.remote,
+        config.search.salary_min,
+    );
     println!("🌐 Fetching: {}\n", search_url);
     
     // Create HTTP client

@@ -42,7 +42,7 @@ async fn test_full_scrape_flow() {
 
 #[test]
 fn test_build_search_url() {
-    let url = scraper::build_search_url("rust", "SF");
+    let url = scraper::build_search_url("rust", "SF", false, None);
     assert!(url.starts_with("https://www.linkedin.com/jobs/search"));
     assert!(url.contains("keywords=rust"));
     assert!(url.contains("location=SF"));

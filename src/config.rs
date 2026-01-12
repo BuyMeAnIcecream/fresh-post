@@ -1,6 +1,14 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
+
+fn deserialize_salary_min<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value: Option<u32> = Option::deserialize(deserializer)?;
+    Ok(value.filter(|&v| v > 0 && v >= 40000))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -11,6 +19,13 @@ pub struct Config {
 pub struct SearchConfig {
     pub keywords: String,
     pub location: String,
+    /// Filter for remote jobs only (uses f_WT=2 parameter)
+    #[serde(default)]
+    pub remote: bool,
+    /// Minimum salary in USD (e.g., 100000 for $100k). LinkedIn uses increments of $20k.
+    /// Valid range: $40k - $200k. Set to 0 or omit to disable salary filter.
+    #[serde(default, deserialize_with = "deserialize_salary_min")]
+    pub salary_min: Option<u32>,
 }
 
 impl Config {
@@ -33,6 +48,8 @@ impl Config {
                 search: SearchConfig {
                     keywords: "rust developer".to_string(),
                     location: "San Francisco Bay Area".to_string(),
+                    remote: false,
+                    salary_min: None,
                 },
             })
         }
@@ -49,6 +66,8 @@ mod tests {
             search: SearchConfig {
                 keywords: "test".to_string(),
                 location: "Test Location".to_string(),
+                remote: false,
+                salary_min: None,
             },
         };
 
