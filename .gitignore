@@ -5,6 +5,10 @@ Cargo.lock
 # State file
 .notifier_state.json
 
+# Debug files
+debug_linkedin.html
+.test_state.json
+
 # IDE
 .idea/
 .vscode/
