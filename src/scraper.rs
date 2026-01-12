@@ -5,6 +5,7 @@ use scraper::{Html, Selector};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use url::Url;
+use regex::Regex;
 
 /// Build a LinkedIn job search URL
 pub fn build_search_url(keywords: &str, location: &str) -> String {
@@ -21,6 +22,12 @@ pub fn build_search_url(keywords: &str, location: &str) -> String {
 
 /// Create an HTTP client with appropriate headers
 pub fn create_client() -> Result<Client> {
+    create_client_with_cookies(None)
+}
+
+/// Create an HTTP client (cookie loading is handled separately in main.rs)
+pub fn create_client_with_cookies(_cookie_file: Option<&str>) -> Result<Client> {
+    // Build the client directly instead of calling create_client() to avoid recursion
     Client::builder()
         .cookie_store(true)
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -28,10 +35,44 @@ pub fn create_client() -> Result<Client> {
         .context("Failed to create HTTP client")
 }
 
+/// Load cookies from a simple text file (format: name=value, one per line)
+/// Returns a cookie header string ready to use
+pub fn load_cookies_from_file(path: &str) -> Result<String> {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read cookie file: {}", path))?;
+    
+    let cookies: Vec<String> = content
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| line.to_string())
+        .collect();
+    
+    let cookie_count = cookies.len();
+    let cookie_header = cookies.join("; ");
+    
+    if !cookie_header.is_empty() {
+        println!("🍪 Loaded {} cookies from {}", cookie_count, path);
+    }
+    
+    Ok(cookie_header)
+}
+
 /// Fetch HTML content from a URL
 pub async fn fetch_jobs_page(client: &Client, url: &str) -> Result<String> {
-    let response = client
-        .get(url)
+    fetch_jobs_page_with_cookies(client, url, None).await
+}
+
+/// Fetch HTML content from a URL with optional cookies
+pub async fn fetch_jobs_page_with_cookies(client: &Client, url: &str, cookies: Option<&str>) -> Result<String> {
+    let mut request = client.get(url);
+    
+    // Add cookies if provided
+    if let Some(cookie_header) = cookies {
+        request = request.header(reqwest::header::COOKIE, cookie_header);
+    }
+    
+    let response = request
         .send()
         .await
         .context("Failed to send HTTP request")?;
@@ -79,8 +120,124 @@ fn parse_relative_date(date_str: &str) -> Option<chrono::NaiveDate> {
     None
 }
 
+/// Try to parse jobs from embedded JSON (logged-in view)
+fn parse_jobs_from_json(html: &str) -> Option<Vec<JobPosting>> {
+    // Look for embedded JSON data - LinkedIn embeds job data in JSON format for logged-in users
+    if !html.contains("jobPostingTitle") && !html.contains("JobPostingCard") {
+        return None;
+    }
+    
+    println!("🔍 Attempting to parse JSON data from logged-in view...");
+    
+    let mut jobs = Vec::new();
+    
+    // Look for jobPostingTitle patterns (HTML-escaped JSON uses &quot;)
+    // Skip the &quot; prefix if present
+    let title_pattern = Regex::new(r#"jobPostingTitle[^:]*:\s*[&quot;"]?([^&"]+?)(?:&quot;|"|,|})"#).ok()?;
+    // Look for primaryDescription text (company name) - need to skip type fields
+    // Pattern: primaryDescription...text: "CompanyName" (avoid matching $type fields)
+    let company_pattern = Regex::new(r#"primaryDescription[^}]*?text[^:]*:\s*[&quot;"]([^&"]+?)(?:&quot;|"|,)"#).ok()?;
+    // Look for secondaryDescription text (location) - same pattern
+    let location_pattern = Regex::new(r#"secondaryDescription[^}]*?text[^:]*:\s*[&quot;"]([^&"]+?)(?:&quot;|"|,)"#).ok()?;
+    // Look for jobPostingUrn to get job ID (handle HTML escaping and different formats)
+    let urn_pattern = Regex::new(r#"urn:li:fsd_jobPosting:(\d+)"#).ok()?;
+    
+    let titles: Vec<_> = title_pattern.captures_iter(html).map(|c| c.get(1).map(|m| m.as_str().to_string())).collect();
+    let companies: Vec<_> = company_pattern.captures_iter(html).map(|c| c.get(1).map(|m| m.as_str().to_string())).collect();
+    let locations: Vec<_> = location_pattern.captures_iter(html).map(|c| c.get(1).map(|m| m.as_str().to_string())).collect();
+    let urns: Vec<_> = urn_pattern.captures_iter(html).map(|c| c.get(1).map(|m| m.as_str().to_string())).collect();
+    
+    println!("   Found: {} titles, {} companies, {} locations, {} urns", 
+             titles.len(), companies.len(), locations.len(), urns.len());
+    
+    // Match up the data - only create jobs when we have titles
+    // Use the number of titles as the limit (we should have matching companies/locations)
+    let max_len = titles.len();
+    
+    for i in 0..max_len {
+        let mut title = titles.get(i).and_then(|t| t.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+        
+        // Clean up HTML entities and prefixes
+        title = title.replace("&quot;", "").replace("quot;", "").trim().to_string();
+        
+        // Skip if title is empty or invalid
+        if title.trim().is_empty() || title == "Unknown" {
+            continue;
+        }
+        
+        // For now, use simplified extraction - the JSON structure is complex
+        // We'll improve this later, but at least get titles and URLs working
+        let company = companies.get(i)
+            .as_ref()
+            .and_then(|c_opt| c_opt.as_ref())
+            .map(|c| {
+                let cleaned = c.replace("&quot;", "").replace("quot;", "").trim().to_string();
+                // Skip if it looks like a type name
+                if cleaned.contains("linkedin") || cleaned.contains("voyager") || cleaned.contains("TextViewModel") {
+                    "Unknown Company".to_string()
+                } else {
+                    cleaned
+                }
+            })
+            .unwrap_or_else(|| "Unknown Company".to_string());
+        
+        let location = locations.get(i)
+            .as_ref()
+            .and_then(|l_opt| l_opt.as_ref())
+            .map(|l| {
+                let cleaned = l.replace("&quot;", "").replace("quot;", "").trim().to_string();
+                // Skip if it looks like a URN
+                if cleaned.starts_with("urn:li:") {
+                    "Location TBD".to_string()
+                } else {
+                    cleaned
+                }
+            })
+            .unwrap_or_else(|| "Location TBD".to_string());
+        
+        // Try to find a matching URN - use index first, then fallback to first available
+        let job_id = urns.get(i).and_then(|u| u.clone())
+            .or_else(|| urns.first().and_then(|u| u.clone()))
+            .unwrap_or_else(|| format!("job_{}", i));
+        
+        let url = if job_id.starts_with("job_") {
+            // Fallback URL if we don't have a real job ID
+            format!("https://www.linkedin.com/jobs/search/?keywords={}", title.replace(" ", "+"))
+        } else {
+            format!("https://www.linkedin.com/jobs/view/{}", job_id)
+        };
+        
+        let id = generate_job_id(&url);
+        
+        jobs.push(JobPosting::new(
+            id,
+            title,
+            company,
+            location,
+            url,
+            Some(chrono::Local::now().date_naive()), // Default to today for now (will be filtered correctly)
+            None,
+        ));
+    }
+    
+    if jobs.is_empty() {
+        None
+    } else {
+        println!("✅ Successfully parsed {} jobs from JSON", jobs.len());
+        Some(jobs)
+    }
+}
+
 /// Parse job postings from HTML
 pub fn parse_jobs_from_html(html: &str) -> Result<Vec<JobPosting>> {
+    // Try JSON parsing first (for logged-in view)
+    if let Some(json_jobs) = parse_jobs_from_json(html) {
+        println!("📊 Parsed {} jobs from JSON data (logged-in view)", json_jobs.len());
+        return Ok(json_jobs);
+    }
+    
+    // Fall back to HTML parsing (for guest view)
     let document = Html::parse_document(html);
     let mut jobs = Vec::new();
     
