@@ -9,6 +9,13 @@ Cargo.lock
 debug_linkedin.html
 .test_state.json
 
+# Cookie files (NEVER commit these!)
+linkedin_cookies.txt
+*.cookies
+
+# Results/output files
+results.txt
+
 # IDE
 .idea/
 .vscode/
