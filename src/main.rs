@@ -1,14 +1,19 @@
 use anyhow::{Context, Result};
-use fresh_post::{filters, scraper, state};
+use fresh_post::{config, filters, scraper, state};
 use std::path::PathBuf;
 
 const STATE_FILE: &str = ".notifier_state.json";
+const COOKIE_FILE: &str = "linkedin_cookies.txt";
+const CONFIG_FILE: &str = "config.toml";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Hardcoded search parameters for now (will move to config/telegram later)
-    let keywords = "rust developer";
-    let location = "San Francisco Bay Area";
+    // Load config
+    let config = config::Config::load_or_default(CONFIG_FILE)
+        .context("Failed to load config")?;
+    
+    let keywords = &config.search.keywords;
+    let location = &config.search.location;
     
     println!("🔍 Searching LinkedIn jobs...");
     println!("   Keywords: {}", keywords);
@@ -25,11 +30,27 @@ async fn main() -> Result<()> {
     let search_url = scraper::build_search_url(keywords, location);
     println!("🌐 Fetching: {}\n", search_url);
     
-    // Create HTTP client and fetch page
+    // Create HTTP client
     let client = scraper::create_client()?;
-    let html = scraper::fetch_jobs_page(&client, &search_url)
-        .await
-        .context("Failed to fetch jobs page")?;
+    
+    // Load cookies if available
+    let cookies = if std::path::Path::new(COOKIE_FILE).exists() {
+        Some(scraper::load_cookies_from_file(COOKIE_FILE)?)
+    } else {
+        println!("ℹ️  No cookie file found. Using guest mode. (Create '{}' to use your account)\n", COOKIE_FILE);
+        None
+    };
+    
+    // Fetch page with cookies if available
+    let html = if let Some(cookie_header) = &cookies {
+        scraper::fetch_jobs_page_with_cookies(&client, &search_url, Some(cookie_header))
+            .await
+            .context("Failed to fetch jobs page")?
+    } else {
+        scraper::fetch_jobs_page(&client, &search_url)
+            .await
+            .context("Failed to fetch jobs page")?
+    };
     
     // DEBUG: Save HTML for inspection
     std::fs::write("debug_linkedin.html", &html)
