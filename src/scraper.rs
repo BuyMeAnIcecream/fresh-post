@@ -40,10 +40,46 @@ pub fn create_client() -> Result<Client> {
 
 /// Create an HTTP client (cookie loading is handled separately in main.rs)
 pub fn create_client_with_cookies(_cookie_file: Option<&str>) -> Result<Client> {
+    use reqwest::header;
+    
+    // Build headers to mimic a real browser more closely
+    let mut headers = header::HeaderMap::new();
+    headers.insert(header::USER_AGENT, header::HeaderValue::from_static(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ));
+    headers.insert(header::ACCEPT, header::HeaderValue::from_static(
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+    ));
+    headers.insert(header::ACCEPT_LANGUAGE, header::HeaderValue::from_static(
+        "en-US,en;q=0.9"
+    ));
+    headers.insert(header::ACCEPT_ENCODING, header::HeaderValue::from_static(
+        "gzip, deflate, br"
+    ));
+    headers.insert(header::REFERER, header::HeaderValue::from_static(
+        "https://www.linkedin.com/"
+    ));
+    headers.insert(
+        header::HeaderName::from_static("sec-fetch-dest"),
+        header::HeaderValue::from_static("document")
+    );
+    headers.insert(
+        header::HeaderName::from_static("sec-fetch-mode"),
+        header::HeaderValue::from_static("navigate")
+    );
+    headers.insert(
+        header::HeaderName::from_static("sec-fetch-site"),
+        header::HeaderValue::from_static("same-origin")
+    );
+    headers.insert(
+        header::HeaderName::from_static("upgrade-insecure-requests"),
+        header::HeaderValue::from_static("1")
+    );
+    
     // Build the client directly instead of calling create_client() to avoid recursion
     Client::builder()
         .cookie_store(true)
-        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .default_headers(headers)
         .build()
         .context("Failed to create HTTP client")
 }
@@ -78,6 +114,11 @@ pub async fn fetch_jobs_page(client: &Client, url: &str) -> Result<String> {
 
 /// Fetch HTML content from a URL with optional cookies
 pub async fn fetch_jobs_page_with_cookies(client: &Client, url: &str, cookies: Option<&str>) -> Result<String> {
+    // Add a delay to avoid rate limiting (LinkedIn may block if requests are too frequent)
+    // This delay helps mimic human behavior
+    println!("⏳ Waiting 3 seconds before request (to avoid rate limiting)...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    
     let mut request = client.get(url);
     
     // Add cookies if provided
@@ -90,8 +131,22 @@ pub async fn fetch_jobs_page_with_cookies(client: &Client, url: &str, cookies: O
         .await
         .context("Failed to send HTTP request")?;
     
-    if !response.status().is_success() {
-        anyhow::bail!("HTTP request failed with status: {}", response.status());
+    let status = response.status();
+    
+    // Handle LinkedIn's anti-bot protection (status 999)
+    if status.as_u16() == 999 {
+        anyhow::bail!(
+            "LinkedIn blocked the request (status 999 - anti-bot protection).\n\
+            Possible solutions:\n\
+            1. Wait a few minutes and try again\n\
+            2. Refresh your cookies (export fresh cookies from browser)\n\
+            3. Use a VPN or different network\n\
+            4. Reduce request frequency (add longer delays)"
+        );
+    }
+    
+    if !status.is_success() {
+        anyhow::bail!("HTTP request failed with status: {} ({})", status, status.as_u16());
     }
     
     response
