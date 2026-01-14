@@ -13,6 +13,8 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub search: SearchConfig,
+    #[serde(default)]
+    pub schedule: ScheduleConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +28,24 @@ pub struct SearchConfig {
     /// Valid range: $40k - $200k. Set to 0 or omit to disable salary filter.
     #[serde(default, deserialize_with = "deserialize_salary_min")]
     pub salary_min: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduleConfig {
+    #[serde(default = "default_interval_hours")]
+    pub interval_hours: u64,
+}
+
+fn default_interval_hours() -> u64 {
+    4
+}
+
+impl Default for ScheduleConfig {
+    fn default() -> Self {
+        Self {
+            interval_hours: default_interval_hours(),
+        }
+    }
 }
 
 impl Config {
@@ -51,6 +71,9 @@ impl Config {
                     remote: false,
                     salary_min: None,
                 },
+                schedule: ScheduleConfig {
+                    interval_hours: default_interval_hours(),
+                },
             })
         }
     }
@@ -68,6 +91,9 @@ mod tests {
                 location: "Test Location".to_string(),
                 remote: false,
                 salary_min: None,
+            },
+            schedule: ScheduleConfig {
+                interval_hours: 4,
             },
         };
 
@@ -87,5 +113,22 @@ location = "San Francisco Bay Area"
         let config: Config = toml::from_str(toml_content).unwrap();
         assert_eq!(config.search.keywords, "rust developer");
         assert_eq!(config.search.location, "San Francisco Bay Area");
+        assert_eq!(config.schedule.interval_hours, 4);
+    }
+
+    #[test]
+    fn test_config_deserialization_with_schedule() {
+        let toml_content = r#"
+[search]
+keywords = "rust developer"
+location = "San Francisco Bay Area"
+[schedule]
+interval_hours = 5
+"#;
+
+        let config: Config = toml::from_str(toml_content).unwrap();
+        assert_eq!(config.search.keywords, "rust developer");
+        assert_eq!(config.search.location, "San Francisco Bay Area");
+        assert_eq!(config.schedule.interval_hours, 5);
     }
 }

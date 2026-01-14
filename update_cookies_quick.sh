@@ -3,7 +3,8 @@
 # Quick script to update just the li_at cookie
 # Usage: ./update_cookies_quick.sh
 
-COOKIE_FILE="linkedin_cookies.txt"
+DATA_DIR="${DATA_DIR:-.}"
+COOKIE_FILE="$DATA_DIR/linkedin_cookies.txt"
 
 echo "🍪 Quick LinkedIn Cookie Update"
 echo ""

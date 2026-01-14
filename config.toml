@@ -3,3 +3,6 @@ keywords = "associate product manager"
 location = "San Francisco Bay Area"
 remote = true
 salary_min = 0  # Set to 0 or omit to disable. Valid range: 40000-200000 (increments of 20000)
+
+[schedule]
+interval_hours = 4

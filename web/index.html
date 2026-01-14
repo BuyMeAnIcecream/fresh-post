@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fresh Post - Config</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <a href="/" class="nav-link active">Config</a>
+      <a href="/jobs" class="nav-link">Jobs</a>
+    </nav>
+
+    <main class="container">
+      <h1>Config</h1>
+      <p class="muted">Update search parameters and schedule.</p>
+
+      <form id="config-form" class="card">
+        <label>
+          Keywords
+          <input type="text" id="keywords" name="keywords" required />
+        </label>
+
+        <label>
+          Location
+          <input type="text" id="location" name="location" required />
+        </label>
+
+        <label class="checkbox">
+          <input type="checkbox" id="remote" name="remote" />
+          Remote only
+        </label>
+
+        <label>
+          Minimum salary (USD)
+          <input type="number" id="salary_min" name="salary_min" min="0" step="1000" />
+        </label>
+
+        <label>
+          Check interval (hours)
+          <input type="number" id="interval_hours" name="interval_hours" min="1" step="1" />
+        </label>
+
+        <div class="actions">
+          <button type="submit">Save</button>
+          <button type="button" id="run-now">Run now</button>
+        </div>
+
+        <div id="config-status" class="status"></div>
+      </form>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

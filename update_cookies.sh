@@ -3,7 +3,8 @@
 # Script to update linkedin_cookies.txt
 # This script helps you easily update your LinkedIn cookies
 
-COOKIE_FILE="linkedin_cookies.txt"
+DATA_DIR="${DATA_DIR:-.}"
+COOKIE_FILE="$DATA_DIR/linkedin_cookies.txt"
 
 echo "🍪 LinkedIn Cookie Updater"
 echo "=========================="

@@ -1,0 +1,129 @@
+:root {
+  --bg: #0f172a;
+  --card: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #60a5fa;
+  --error: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.nav {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+  background: #0b1220;
+  border-bottom: 1px solid #1f2937;
+}
+
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav-link.active {
+  color: var(--accent);
+}
+
+.container {
+  max-width: 760px;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+.card {
+  background: var(--card);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+}
+
+label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #0b1220;
+  color: var(--text);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+button {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: #0b1220;
+  cursor: pointer;
+}
+
+.status {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.jobs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.job-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #1f2937;
+}
+
+.job-item:last-child {
+  border-bottom: none;
+}
+
+.job-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.job-meta {
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.job-item a {
+  color: var(--accent);
+  text-decoration: none;
+}
